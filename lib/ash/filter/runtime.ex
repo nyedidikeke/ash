@@ -373,6 +373,7 @@ defmodule Ash.Filter.Runtime do
   defp resolve_expr({:_arg, _}, _, _, _, _), do: :unknown
   defp resolve_expr({:_ref, _}, _, _, _, _), do: :unknown
   defp resolve_expr({:_ref, _, _}, _, _, _, _), do: :unknown
+  defp resolve_expr({:_combinations, _}, _, _, _, _), do: :unknown
   defp resolve_expr({:_parent, _}, _, _, _, _), do: :unknown
   defp resolve_expr({:_parent, _, _}, _, _, _, _), do: :unknown
   defp resolve_expr({:_atomic_ref, _}, _, _, _, _), do: :unknown
@@ -812,6 +813,15 @@ defmodule Ash.Filter.Runtime do
       Enum.count(args) == given_arg_count
     end)
     |> Enum.find_value(&Ash.Query.Function.try_cast_arguments(&1, args))
+  end
+
+  defp resolve_ref(%Ash.Query.Ref{attribute: name, combinations?: true}, record, _, _, _) do
+    with :error <- Map.fetch(record.calculations, name),
+         :error <- Map.fetch(record, name) do
+      :unknown
+    else
+      value -> {:ok, value}
+    end
   end
 
   defp resolve_ref(

@@ -1843,8 +1843,23 @@ defmodule Ash.Policy.Authorizer do
     {:ok, {Ash.Policy.Check.Expression, expr: expr}}
   end
 
+  @templates [
+    :_actor,
+    :_arg,
+    :_ref,
+    :_combination,
+    :_parent,
+    :_atomic_ref,
+    :_context
+  ]
+
   def template_var({template_var, _} = expr)
-      when template_var in [:_actor, :_arg, :_ref, :_parent, :_atomic_ref, :_context] do
+      when template_var in @templates do
+    {:ok, {Ash.Policy.Check.Expression, expr: expr}}
+  end
+
+  def template_var({template_var, _, _} = expr)
+      when template_var in @templates do
     {:ok, {Ash.Policy.Check.Expression, expr: expr}}
   end
 

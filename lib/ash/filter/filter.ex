@@ -2289,6 +2289,7 @@ defmodule Ash.Filter do
     expression
     |> do_list_refs(no_longer_simple?, in_an_eq?, expand_calculations?, expand_get_path?)
     |> Enum.uniq()
+    |> Enum.reject(& &1.combinations?)
   end
 
   defp do_list_refs(list, no_longer_simple?, in_an_eq?, expand_calculations?, expand_get_path?)
@@ -3535,6 +3536,19 @@ defmodule Ash.Filter do
     )
   end
 
+  def do_hydrate_refs({:_combinations, value}, context) do
+    do_hydrate_refs(
+      %Ash.Query.Ref{
+        attribute: value,
+        relationship_path: [],
+        input?: Map.get(context, :input?, false),
+        combinations?: true,
+        resource: context.root_resource
+      },
+      context
+    )
+  end
+
   def do_hydrate_refs({:_ref, path, value}, context) do
     do_hydrate_refs(
       %Ash.Query.Ref{
@@ -3555,6 +3569,10 @@ defmodule Ash.Filter do
       other ->
         other
     end
+  end
+
+  def do_hydrate_refs(%Ref{combinations?: true} = ref, _) do
+    {:ok, ref}
   end
 
   def do_hydrate_refs(
