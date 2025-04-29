@@ -995,9 +995,26 @@ defmodule Ash.DataLayer.Ets do
       unique_keys ->
         unions_of
         |> Enum.reduce_while({:ok, []}, fn {type, union_query}, {:ok, records} ->
-          # todo: handle type
+          raise "handle calculations and select here"
+
           case run_query(%{union_query | tenant: tenant}, resource, parent) do
             {:ok, results} ->
+              results = Ash.load!(Map.values(calculations))
+
+              case type do
+                type when type in [:base, :union_all] ->
+                  {:cont, {:ok, Enum.reverse(results, records)}}
+
+                :union ->
+                  raise "not yet"
+
+                :intersect ->
+                  raise "not yet"
+
+                :except ->
+                  raise "not yet"
+              end
+
               {:cont, {:ok, Enum.reverse(results, records)}}
 
             {:error, error} ->

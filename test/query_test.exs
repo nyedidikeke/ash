@@ -119,7 +119,7 @@ defmodule Ash.Test.QueryTest do
                    limit: 1,
                    sort: [email: :desc]
                  ),
-                 Ash.Query.Combination.union(
+                 Ash.Query.Combination.union_all(
                    filter: expr(contains(email, "bar.com")),
                    limit: 1,
                    sort: [email: :asc]
@@ -145,16 +145,18 @@ defmodule Ash.Test.QueryTest do
                    calculations: %{match_group: calc(2, type: :integer)},
                    sort: [email: :desc]
                  ),
-                 Ash.Query.Combination.union(
+                 Ash.Query.Combination.union_all(
                    filter: expr(contains(email, "bar.com")),
                    calculations: %{match_group: calc(2, type: :integer)},
                    limit: 1,
                    sort: [email: :asc]
                  )
                ])
+               |> IO.inspect()
                |> Ash.Query.sort([{calc(^combinations(:match_group)), :desc}])
                |> Ash.Query.distinct([{calc(^combinations(:match_group)), :asc}])
                |> Ash.read!()
+               |> IO.inspect()
     end
   end
 

@@ -480,6 +480,7 @@ defmodule Ash.Actions.Read do
              query.resource,
              query.domain,
              parent_stack: parent_stack_from_context(query.context),
+             first_combination: Enum.at(query.combination_of, 0),
              source_context: query.context
            ),
          query <- %{
@@ -862,6 +863,7 @@ defmodule Ash.Actions.Read do
       |> Ash.Filter.hydrate_refs(%{
         resource: query.resource,
         public?: false,
+        first_combination: Enum.at(query.combination_of, 0),
         parent_stack: parent_stack_from_context(query.context)
       })
       |> case do
@@ -1849,7 +1851,7 @@ defmodule Ash.Actions.Read do
         calc = add_calc_context(calc, actor, authorize?, tenant, tracer, domain, resource, opts)
 
         if should_expand_expression?(struct, calc, opts) do
-          case expand_expression(calc, resource, opts[:parent_stack]) do
+          case expand_expression(calc, resource, opts[:parent_stack], opts[:first_combination]) do
             {:ok, expr} ->
               args =
                 case calc do
@@ -1904,7 +1906,7 @@ defmodule Ash.Actions.Read do
       calc.module.has_expression?()
   end
 
-  defp expand_expression(calc, resource, parent_stack) do
+  defp expand_expression(calc, resource, parent_stack, first_combination) do
     calc.module.expression(calc.opts, calc.context)
     |> case do
       %Ash.Query.Function.Type{} = expr ->
@@ -1917,7 +1919,12 @@ defmodule Ash.Actions.Read do
         {:ok, expr} = Ash.Query.Function.Type.new([expr, calc.type, calc.constraints])
         expr
     end
-    |> Ash.Filter.hydrate_refs(%{resource: resource, public?: false, parent_stack: parent_stack})
+    |> Ash.Filter.hydrate_refs(%{
+      resource: resource,
+      public?: false,
+      parent_stack: parent_stack,
+      first_combination: first_combination
+    })
   end
 
   @doc false
@@ -2361,7 +2368,7 @@ defmodule Ash.Actions.Read do
         tracer,
         query.resource,
         domain,
-        opts
+        Keyword.put(opts, :first_combination, Enum.at(query.combination_of, 0))
       )
 
     %{
@@ -3353,6 +3360,7 @@ defmodule Ash.Actions.Read do
         case Ash.Filter.hydrate_refs(expression, %{
                resource: query.resource,
                public?: false,
+               first_combination: Enum.at(query.combination_of, 0),
                parent_stack: parent_stack_from_context(query.context)
              }) do
           {:ok, expression} ->

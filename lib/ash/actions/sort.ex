@@ -68,34 +68,32 @@ defmodule Ash.Actions.Sort do
   * `:lazy?` - Whether to use already loaded values or to re-load them when necessary. Defaults to `false`
   * `:resource` - The resource being sorted.
   """
-  def runtime_sort(results, sort, opts \\ [])
-  def runtime_sort([], _empty, _), do: []
-  def runtime_sort(results, empty, _) when empty in [nil, []], do: results
-  def runtime_sort([single_result], _, _), do: [single_result]
-
-  def runtime_sort(results, [{field, direction}], opts) do
+  def runtime_sort(results, sort, opts \\ []) do
     resource = get_resource(results, opts)
 
+    results
+    |> do_runtime_sort(resource, sort, opts)
+    |> maybe_rekey(results, resource, Keyword.get(opts, :rekey?, true))
+  end
+
+  defp do_runtime_sort([], _resource, _empty, _), do: []
+  defp do_runtime_sort(results, _resource, empty, _) when empty in [nil, []], do: results
+  defp do_runtime_sort([single_result], _resource, _, _), do: [single_result]
+
+  defp do_runtime_sort(results, resource, [{field, direction}], opts) do
     results
     |> load_field(field, resource, opts)
     |> Enum.sort_by(&resolve_field(&1, field), to_sort_by_fun(direction))
   end
 
-  def runtime_sort(results, [{field, direction} | rest], opts) do
-    # we need check if the field supports simple equality, and if so then we can use
-    # uniq_by
-    #
-    # otherwise, we need to do our own matching
-    resource = get_resource(results, opts)
-
+  defp do_runtime_sort(results, resource, [{field, direction} | rest], opts) do
     results
     |> load_field(field, resource, opts)
     |> Enum.group_by(&resolve_field(&1, field))
     |> Enum.sort_by(fn {key, _value} -> key end, to_sort_by_fun(direction))
     |> Enum.flat_map(fn {_, records} ->
-      runtime_sort(records, rest, Keyword.put(opts, :rekey?, false))
+      do_runtime_sort(records, resource, rest, Keyword.put(opts, :rekey?, false))
     end)
-    |> maybe_rekey(results, resource, Keyword.get(opts, :rekey?, true))
   end
 
   defp get_resource(results, opts) do
@@ -125,22 +123,25 @@ defmodule Ash.Actions.Sort do
 
   defp maybe_rekey(new_results, _, _, _), do: new_results
 
-  def runtime_distinct(results, sort, opts \\ [])
-  def runtime_distinct([], _empty, _), do: []
-  def runtime_distinct(results, empty, _) when empty in [nil, []], do: results
-  def runtime_distinct([single_result], _, _), do: [single_result]
+  def runtime_distinct(results, sort, opts \\ []) do
+    resource = get_resource(results, opts)
 
-  def runtime_distinct([%resource{} | _] = results, distinct, opts) do
-    # we need check if the field supports simple equality, and if so then we can use
-    # uniq_by
-    #
-    # otherwise, we need to do our own matching
+    results
+    |> do_runtime_distinct(resource, sort, opts)
+    |> maybe_rekey(results, resource, Keyword.get(opts, :rekey?, true))
+  end
+
+  defp do_runtime_distinct([], _resource, _empty, _), do: []
+  defp do_runtime_distinct(results, _resource, empty, _) when empty in [nil, []], do: results
+  defp do_runtime_distinct([single_result], _resource, _, _), do: [single_result]
+
+  defp do_runtime_distinct(results, resource, distinct, opts) do
     fields = Enum.map(distinct, &elem(&1, 0))
 
     results
     |> load_field(fields, resource, opts)
     |> Enum.to_list()
-    |> runtime_sort(distinct, opts)
+    |> do_runtime_sort(distinct, opts)
     |> Enum.uniq_by(&Map.take(&1, fields))
   end
 

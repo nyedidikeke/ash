@@ -3571,6 +3571,20 @@ defmodule Ash.Filter do
     end
   end
 
+  def do_hydrate_refs(%Ref{combinations?: true, attribute: attribute} = ref, %{
+        resource: resource,
+        first_combination: first_combination
+      })
+      when is_atom(attribute) and not is_nil(first_combination) do
+    with :error <- combination_calc(first_combination, attribute),
+         :error <- combination_attr(resource, first_combination, attribute) do
+      {:error, "Invalid combination reference #{inspect(ref)}"}
+    else
+      {:error, error} -> {:error, error}
+      {:ok, attr} -> {:ok, %{ref | attribute: attr}}
+    end
+  end
+
   def do_hydrate_refs(%Ref{combinations?: true} = ref, _) do
     {:ok, ref}
   end
@@ -3907,6 +3921,48 @@ defmodule Ash.Filter do
 
   def do_hydrate_refs(val, _context) do
     {:ok, val}
+  end
+
+  defp combination_calc(first_combination, attribute) do
+    with {:ok, calc} <- Map.fetch(first_combination.calculations, attribute) do
+      case calc do
+        %Ash.Query.Calculation{type: type, constraints: constraints} when not is_nil(type) ->
+          {:ok, %Ash.Query.CombinationAttr{type: type, constraints: constraints, name: attribute}}
+
+        %Ash.Query.Calculation{} = calculation ->
+          {:error,
+           """
+           Calculation #{calculation} must be added with a type to refer to it with `combinations/1`
+
+           For example:
+
+             calc(foo <> bar, type: :string)
+           """}
+
+        other ->
+          {:error, "Invalid combination calculation #{inspect(other)}"}
+      end
+    end
+  end
+
+  defp combination_attr(resource, first_combination, attribute_name) do
+    attribute = Ash.Resource.Info.attribute(resource, attribute_name)
+
+    if !attribute do
+      :error
+    else
+      if (first_combination.select && attribute_name in first_combination.select) ||
+           attribute_name in Ash.Resource.Info.selected_by_default_attribute_names(resource) do
+        {:ok,
+         %Ash.Query.CombinationAttr{
+           type: attribute.type,
+           constraints: attribute.constraints,
+           name: attribute.name
+         }}
+      else
+        {:error, "#{attribute_name} is not selected nor is it a calculation in the combinations."}
+      end
+    end
   end
 
   defp validate_data_layers_support_boolean_filters(%BooleanExpression{
